@@ -1,0 +1,86 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   开场任务简报（briefing）
+   ═══════════════════════════════════════════════════════════════════════ */
+.brief{
+  position:fixed;inset:0;z-index:120;
+  display:grid;place-items:center;
+  padding:24px;
+  background:radial-gradient(120% 90% at 50% 40%,rgba(5,7,11,.30),rgba(5,7,11,.86));
+  backdrop-filter:blur(3px) saturate(1.05);
+  -webkit-backdrop-filter:blur(3px) saturate(1.05);
+  animation:brFade .4s ease both;
+}
+.brief[hidden]{display:none}
+@keyframes brFade{from{opacity:0}to{opacity:1}}
+.brief-in{
+  width:min(560px,100%);
+  max-height:calc(100vh - 48px);
+  overflow:auto;
+  padding:26px 28px 22px;
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  background:linear-gradient(180deg,rgba(12,18,26,.94),rgba(8,12,18,.96));
+  box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(232,192,122,.07) inset;
+  position:relative;
+  animation:brRise .45s cubic-bezier(.2,.8,.25,1) both .05s;
+}
+@keyframes brRise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.brief-in::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold-dim),var(--cyan),transparent);
+  opacity:.7;
+}
+.brief-mark{color:var(--gold);opacity:.9;margin-bottom:6px;line-height:0}
+.brief h2{
+  font-family:var(--disp);font-weight:600;letter-spacing:.04em;
+  font-size:30px;line-height:1.05;margin:0 0 2px;color:var(--tx);
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+}
+.brief h2 span{
+  font-family:var(--mono);font-size:12px;letter-spacing:.34em;
+  color:var(--gold);font-weight:400;
+}
+.brief-sub{margin:0 0 18px;color:var(--tx2);font-size:12.5px;letter-spacing:.06em}
+.brief-steps{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:9px}
+.brief-steps li{
+  display:grid;grid-template-columns:78px 1fr;gap:12px;align-items:baseline;
+  padding:9px 11px;border:1px solid var(--line);border-radius:var(--r);
+  background:rgba(255,255,255,.018);
+}
+.brief-steps b{
+  font-family:var(--disp);font-weight:400;font-size:14px;letter-spacing:.12em;
+  color:var(--gold2);
+}
+.brief-steps span{font-size:12.5px;line-height:1.55;color:var(--tx2)}
+.brief-obj{
+  display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:center;
+  padding:11px 13px;margin-bottom:16px;
+  border:1px solid rgba(111,211,224,.26);border-radius:var(--r);
+  background:linear-gradient(90deg,rgba(111,211,224,.09),rgba(111,211,224,0) 70%);
+}
+.brief-obj .bo-tag{
+  grid-row:1/3;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  color:var(--cyan);opacity:.9;
+}
+.brief-obj b{font-size:15px;color:var(--tx);font-weight:600}
+.brief-obj i{grid-column:2;font-style:normal;font-size:12px;color:var(--tx2)}
+.brief-btns{display:flex;gap:10px;flex-wrap:wrap}
+.brief-foot{
+  margin:14px 0 0;font-family:var(--mono);font-size:10.5px;
+  color:var(--tx3);letter-spacing:.04em;
+}
+.brief kbd{
+  font-family:var(--mono);font-size:10px;padding:1px 5px;border-radius:2px;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--tx2);
+}
+@media (max-width:520px){
+  .brief-in{padding:20px 18px 18px}
+  .brief h2{font-size:24px}
+  .brief-steps li{grid-template-columns:1fr;gap:3px}
+  .brief-obj{grid-template-columns:1fr}
+  .brief-obj .bo-tag{grid-row:auto}
+  .brief-obj i{grid-column:1}
+}
+@media (prefers-reduced-motion:reduce){
+  .brief,.brief-in{animation:none}
+}

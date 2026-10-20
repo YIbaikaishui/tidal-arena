@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#070b11" />
+<meta name="description" content="潮汐场 TIDAL ARENA — 8 万人专业足球场三维方案演示" />
+<title>潮汐场 TIDAL ARENA · 8 万人专业足球场</title>
+<!-- 内联图标：避免浏览器默认请求 /favicon.ico 产生 404 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23070b11'/%3E%3Cellipse cx='16' cy='16' rx='11' ry='7.4' fill='none' stroke='%23e8c07a' stroke-width='1.5'/%3E%3Cellipse cx='16' cy='16' rx='5.2' ry='3.4' fill='none' stroke='%236fd3e0' stroke-width='1.1'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/build/three.module.js",
+    "three/addons/": "./vendor/examples/jsm/"
+  }
+}
+</script>
+
+</head>
+<body>
+
+<canvas id="gl" aria-label="潮汐场三维场景" role="img"></canvas>
+<div id="grain" aria-hidden="true"></div>
+<div id="vignette" aria-hidden="true"></div>
+
+<!-- ══════════ 载入 ══════════ -->
+<div id="loader" role="status" aria-live="polite">
+  <div class="ld-inner">
+    <div class="ld-mark">
+      <svg viewBox="0 0 120 120" width="86" height="86" aria-hidden="true">
+        <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".35"/>
+        <circle cx="60" cy="60" r="40" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/>
+        <path d="M18 60 Q60 22 102 60 Q60 98 18 60Z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+        <path d="M34 60 Q60 40 86 60 Q60 80 34 60Z" fill="currentColor" opacity=".18"/>
+      </svg>
+    </div>
+    <div class="ld-title">潮汐场<span>TIDAL ARENA</span></div>
+    <div class="ld-sub">8 万人专业足球场 · 三维呈现</div>
+    <div class="ld-bar"><i id="ldFill"></i></div>
+    <div class="ld-step" id="ldStep">正在初始化渲染管线…</div>
+  </div>
+</div>
+
+<!-- ══════════ 开场任务简报 ══════════ -->
+<div id="briefing" class="brief" role="dialog" aria-modal="false" aria-labelledby="brTitle" hidden>
+  <div class="brief-in">
+    <div class="brief-mark" aria-hidden="true">
+      <svg viewBox="0 0 120 120" width="52" height="52">
+        <path d="M14 60 Q60 18 106 60 Q60 102 14 60Z" fill="none" stroke="currentColor" stroke-width="2.4"/>
+        <path d="M38 60 Q60 44 82 60 Q60 76 38 60Z" fill="currentColor" opacity=".35"/>
+      </svg>
+    </div>
+    <h2 id="brTitle">潮汐场<span>TIDAL ARENA</span></h2>
+    <p class="brief-sub">8 万人专业足球场 · 四潮八柱 · 鞍面悬浮</p>
+
+    <ol class="brief-steps">
+      <li><b>跟随光柱</b><span>按 <kbd>F</kbd> 进入第一人称漫游。青色光柱指向当前目标，走近即自动完成任务。</span></li>
+      <li><b>调度出口</b><span>打开左侧「疏散」面板，用 <b>10 组人力</b>调度 12 个出口，把全馆观众安全送出。</span></li>
+      <li><b>收集徽章</b><span>5 枚建筑徽章散落在广场 / 门厅 / 环廊 / 中圈；升级还会解锁黄昏、滤镜与建筑洞察图鉴。</span></li>
+    </ol>
+
+    <div class="brief-obj">
+      <span class="bo-tag">当前目标</span>
+      <b id="briefObj">抵达球迷广场</b>
+      <i id="briefDesc">走出场馆，来到南侧球迷广场</i>
+    </div>
+
+    <div class="brief-btns">
+      <button class="btn primary" id="briefGo" type="button">开始探索</button>
+      <button class="btn ghost" id="briefSkip" type="button">先看建筑</button>
+    </div>
+    <p class="brief-foot"><kbd>F</kbd> 漫游 ｜ <kbd>P</kbd> 导览 ｜ <kbd>H</kbd> 说明 ｜ <kbd>C</kbd> 照片 ｜ <kbd>Tab</kbd> 面板</p>
+  </div>
+</div>
+
+<!-- ══════════ HUD ══════════ -->
+<div id="hud">
+
+  <!-- ───── 顶栏 ───── -->
+  <header class="top" id="topbar">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 120 120" width="24" height="24">
+          <path d="M14 60 Q60 18 106 60 Q60 102 14 60Z" fill="none" stroke="currentColor" stroke-width="3"/>
+          <path d="M38 60 Q60 44 82 60 Q60 76 38 60Z" fill="currentColor" opacity=".35"/>
+        </svg>
+      </div>
+      <div class="name">潮汐场<em>TIDAL ARENA</em></div>
+    </div>
+
+    <div class="readout" id="readout" role="group" aria-label="场馆实时数据">
+      <div class="ro"><span>总座席</span><b id="roSeat">80,184</b></div>
+      <div class="ro"><span>看台层</span><b id="roTier">3</b></div>
+      <div class="ro"><span>观众区</span><b id="roZone">60</b></div>
+      <div class="ro"><span>座排</span><b id="roRow">61</b></div>
+      <div class="ro"><span>视距</span><b id="roDist">—</b></div>
+      <div class="ro"><span>帧率</span><b id="roFps">—</b></div>
+    </div>
+
+    <div class="topright">
+      <button class="chip" id="btnBrief" data-tip="任务简报（B）" aria-label="打开任务简报">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M5 6.5h14M5 12h9M5 17.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>简报</span>
+      </button>
+      <button class="chip" id="btnEnv" data-tip="切换昼夜（N）" aria-label="切换昼夜照明，当前夜赛">
+        <i class="dot" id="envDot" aria-hidden="true"></i><span id="envName">夜赛</span>
+      </button>
+      <button class="chip" id="btnMatch" data-tip="比赛日：点击进入下一时段" aria-label="比赛日 当前时段 赛前" hidden>
+        <i class="dot" id="matchDot" aria-hidden="true"></i><span id="matchName">赛前</span><em id="matchTime">01</em>
+      </button>
+      <button class="chip icon" id="btnSound" data-tip="环境音效（M）" aria-label="环境音效开关" aria-pressed="false">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="sndwave" d="M16 8a5 5 0 010 8" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".8"/></svg>
+      </button>
+      <button class="chip icon" id="btnSettings" data-tip="设置" aria-label="打开设置">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+      <button class="chip icon" id="btnHelp" data-tip="操作说明（H）" aria-label="打开操作说明">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.6v5M12 15.4v1.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ───── 左栏 ───── -->
+  <aside class="left" id="railLeft" aria-label="任务与数据面板">
+    <div class="rail" role="tablist" aria-label="左栏面板" aria-orientation="vertical">
+      <button class="ritem" data-panel="quest" role="tab" aria-label="探索任务" aria-controls="pQuest" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M5 12.5l4.2 4.3L19 6.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <em>任务</em>
+      </button>
+      <button class="ritem" data-panel="cap" role="tab" aria-label="容量统计仪表" aria-controls="pCap" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 19V9M9.3 19V5M14.7 19v-7M20 19v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <em>容量</em>
+      </button>
+      <button class="ritem" data-panel="flow" role="tab" aria-label="疏散人流模拟" aria-controls="pFlow" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 17l4-5 3 2.5 3-6 4 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19" cy="6" r="1.7" fill="currentColor"/></svg>
+        <em>疏散</em>
+      </button>
+    </div>
+
+    <div class="col" id="colLeft">
+      <!-- ① 探索任务 -->
+      <section class="panel" id="pQuest" data-panel="quest" data-title="探索任务">
+        <button class="ph" type="button" aria-expanded="true" aria-controls="pQuestBody">
+          <i class="ic ic-g" aria-hidden="true"></i>
+          <h3>探索任务</h3>
+          <span class="pct" id="questPct">0/6</span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="pb" id="pQuestBody">
+          <div class="questhead">
+            <div class="ring" role="img" aria-label="任务完成进度">
+              <svg viewBox="0 0 60 60" width="46" height="46" aria-hidden="true">
+                <circle cx="30" cy="30" r="25" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="3.4"/>
+                <circle id="ringArc" cx="30" cy="30" r="25" fill="none" stroke="#e8c07a" stroke-width="3.4"
+                  stroke-linecap="round" stroke-dasharray="157.1" stroke-dashoffset="157.1"
+                  transform="rotate(-90 30 30)" style="transition:stroke-dashoffset .7s cubic-bezier(.2,.8,.2,1)"/>
+              </svg>
+              <b id="ringNum">0<em>%</em></b>
+            </div>
+            <div class="qsum">
+              <b id="qDone">0<em>/6 完成</em></b>
+              <span id="qNext">下一目标：抵达球迷广场南入口</span>
+            </div>
+          </div>
+          <div class="quest" id="questList" role="list"></div>
+          <div class="scorebar">
+            <div class="lv" title="探索等级"><b id="lvNum">1</b><em>级</em></div>
+            <div class="xpwrap">
+              <div class="xp"><i id="xpFill"></i></div>
+              <div class="xplab"><span><i id="xpVal">0</i> / <i id="xpMax">120</i> 徽章积分</span><span id="xpPct">0%</span></div>
+            </div>
+          </div>
+          <div class="badgerow" id="badgeRow" aria-label="收集徽章"></div>
+
+          <!-- 建筑洞察图鉴（Lv.5 解锁） -->
+          <div class="codex" id="codexBox">
+            <div class="cx-head">
+              <span>建筑洞察图鉴</span>
+              <b id="cxCount">0/12</b>
+            </div>
+            <div class="cx-list" id="codexList"></div>
+            <p class="cx-lock" id="cxLock">达到 Lv.5 解锁图鉴讲解 · 继续探索积累积分</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ② 容量统计仪表 -->
+      <section class="panel" id="pCap" data-panel="cap" data-title="容量统计仪表">
+        <button class="ph" type="button" aria-expanded="true" aria-controls="pCapBody">
+          <i class="ic ic-c" aria-hidden="true"></i>
+          <h3>容量统计仪表</h3>
+          <span class="pct" id="capMode">实时</span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="pb" id="pCapBody">
+          <div class="caphero">
+            <div class="capnum"><span id="capNum" role="status" aria-live="off">80,184</span><em>座</em></div>
+            <div class="capsub" id="capSub">3 层看台 · 61 排 · 20 区/层</div>
+          </div>
+          <div class="tierbars" id="tierBars"></div>
+          <div class="capzone">
+            <div class="czhead"><span>分区座位数</span><span class="cztip">点击定位 · 每层 20 区</span></div>
+            <div class="czgrid" id="czGrid" role="group" aria-label="分区座位数，点击定位"></div>
+          </div>
+          <div class="capextra">
+            <div class="cx"><b id="cxWheel">120</b><span>无障碍席</span></div>
+            <div class="cx"><b id="cxVip">768</b><span>包厢席</span></div>
+            <div class="cx"><b id="cxPress">320</b><span>媒体席</span></div>
+          </div>
+          <button class="btn xs wide ghost" id="btnRows" aria-expanded="false" aria-controls="rowTable">展开逐排表 ▾</button>
+          <div class="rowtable" id="rowTable" hidden></div>
+        </div>
+      </section>
+
+      <!-- ③ 疏散人流模拟 -->
+      <section class="panel" id="pFlow" data-panel="flow" data-title="疏散人流模拟">
+        <button class="ph" type="button" aria-expanded="true" aria-controls="pFlowBody">
+          <i class="ic ic-f" aria-hidden="true"></i>
+          <h3>疏散人流模拟</h3>
+          <span class="pct" id="flowPct">待启动</span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="pb" id="pFlowBody">
+          <div class="flowrow">
+            <button class="btn xs" id="btnFlow">开始演练</button>
+            <button class="btn xs ghost" id="btnFlowPause" disabled>暂停</button>
+            <button class="btn xs ghost" id="btnFlowReset">重置</button>
+          </div>
+          <div class="flowstats">
+            <div><b id="flOut">0</b><span>已疏散</span></div>
+            <div><b id="flLeft">80,184</b><span>滞留</span></div>
+            <div><b id="flTime">0:00</b><span>用时</span></div>
+          </div>
+          <div class="flowbar" role="progressbar" aria-label="疏散进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="flowBar"><i id="flowFill"></i></div>
+          <div class="flowrow2">
+            <button class="btn xs ghost" id="btnFlowMode" aria-pressed="false">热力</button>
+            <button class="btn xs ghost" id="btnFlowView" aria-pressed="false">俯视观察</button>
+          </div>
+          <!-- v4：工况（scenario）—— 每种工况的出口能力/步行速度/时限不同，最优解也不同 -->
+          <div class="scenrow" role="group" aria-label="疏散工况">
+            <span class="scenlabel">工况</span>
+            <div class="scenchips" id="scenChips"></div>
+          </div>
+          <div class="scenbrief" id="scenBrief">标准工况：无风无雨，出口能力正常。</div>
+          <div class="flowmeta">
+            <span>人力 <b id="flTeams">10/10</b></span>
+            <span>时限 <b id="flLimit">110″</b></span>
+            <span>广播 <b id="flBc">3</b></span>
+            <span>评级 <b id="flGrade">—</b></span>
+          </div>
+          <div class="flowlegend">
+            <span><i style="background:#e2603f"></i>拥堵</span>
+            <span><i style="background:#e0a94b"></i>缓慢</span>
+            <span><i style="background:#5fbf8a"></i>畅通</span>
+            <span id="flScore">评分 —</span>
+          </div>
+
+          <!-- 潮汐调度台：出口 + 人力 + 广播 -->
+          <div class="disp" id="disp">
+            <div class="disp-head">
+              <span class="dl">潮汐调度台</span>
+              <div class="teams" title="值守人力预算">
+                <i id="teamFill"></i><b id="teamTxt">8/12</b>
+              </div>
+            </div>
+            <p class="disp-hint">点击出口切换开放 / 关闭 · 调配需 6 秒 · 主券洞 2 组人力 / 次门 1 组</p>
+            <div class="exits" id="exitGrid" role="group" aria-label="出口调度"></div>
+            <div class="quads" id="quadRow" role="group" aria-label="四向拥堵"></div>
+            <div class="flowrow2">
+              <button class="btn xs" id="btnBroadcast" type="button">应急广播 <b id="bcLeft">3</b></button>
+              <span class="grade" id="flowGrade">评级 —</span>
+              <span class="fin" id="flowFin"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- ───── 右栏 ───── -->
+  <aside class="right" id="railRight" aria-label="表达与控制面板">
+    <div class="rail" role="tablist" aria-label="右栏面板" aria-orientation="vertical">
+      <button class="ritem" data-panel="view" role="tab" aria-label="表达方式与相机" aria-controls="pView" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 3l8 4.6v8.8L12 21l-8-4.6V7.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 3v18M4 7.6l16 8.8M20 7.6L4 16.4" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/></svg>
+        <em>表达</em>
+      </button>
+      <button class="ritem" data-panel="layer" role="tab" aria-label="构件图层" aria-controls="pLayer" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 4l8 4-8 4-8-4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <em>图层</em>
+      </button>
+      <button class="ritem" data-panel="build" role="tab" aria-label="建造时间轴" aria-controls="pBuild" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.4V12l3.2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <em>建造</em>
+      </button>
+      <button class="ritem" data-panel="contest" role="tab" aria-label="成绩与挑战" aria-controls="pContest" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M8 4h8v5a4 4 0 01-8 0z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 5H4.6v1.8A3.4 3.4 0 008 10.2M16 5h3.4v1.8A3.4 3.4 0 0116 10.2M12 13v3.4M9 20h6l-.8-3.6h-4.4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <em>成绩</em>
+      </button>
+    </div>
+
+    <div class="col" id="colRight">
+      <section class="panel" id="pView" data-panel="view" data-title="表达方式">
+        <button class="ph" type="button" aria-expanded="true" aria-controls="pViewBody">
+          <i class="ic ic-v" aria-hidden="true"></i>
+          <h3>表达方式</h3>
+          <span class="pct" id="matName">材质</span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="pb" id="pViewBody">
+          <div class="seg" id="segMat" role="group" aria-label="表达方式">
+            <button data-mat="material" class="on" aria-pressed="true">材质</button>
+            <button data-mat="white" aria-pressed="false">白模</button>
+            <button data-mat="xray" aria-pressed="false">X 光</button>
+          </div>
+          <div class="seglab">相机视图</div>
+          <div class="grid4" id="gridView" role="group" aria-label="相机视图">
+            <button data-view="persp" class="on" aria-pressed="true">透视</button>
+            <button data-view="plan" aria-pressed="false">俯视</button>
+            <button data-view="front" aria-pressed="false">正立</button>
+            <button data-view="left" aria-pressed="false">侧立</button>
+            <button data-view="section" aria-pressed="false">剖面</button>
+            <button data-view="pitch" aria-pressed="false">场内</button>
+          </div>
+          <div class="sliderrow">
+            <label for="rgExplode">分层拆解</label>
+            <input type="range" id="rgExplode" min="0" max="100" value="0" aria-label="分层拆解 0 到 100" />
+            <b id="exVal">0%</b>
+          </div>
+          <div class="sliderrow">
+            <label for="rgSection">剖切位置</label>
+            <input type="range" id="rgSection" min="-260" max="260" value="0" aria-label="剖切位置" />
+            <b id="secVal">0</b>
+          </div>
+          <button class="btn xs wide ghost" id="btnSecToggle" aria-pressed="false">开启剖切（X）</button>
+        </div>
+      </section>
+
+      <section class="panel" id="pLayer" data-panel="layer" data-title="构件图层">
+        <button class="ph" type="button" aria-expanded="true" aria-controls="pLayerBody">
+          <i class="ic ic-l" aria-hidden="true"></i>
+          <h3>构件图层</h3>
+          <span class="pct" id="layerCount">10/10</span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="pb" id="pLayerBody">
+          <div class="layers" id="layerList" role="group" aria-label="构件图层开关"></div>
+          <div class="hint">单击显隐 · 双击孤立 · 右键隐藏</div>
+        </div>
+      </section>
+
+      <section class="panel" id="pBuild" data-panel="build" data-title="建造时间轴">
+        <button class="ph" type="button" aria-expanded="true" aria-controls="pBuildBody">
+          <i class="ic ic-b" aria-hidden="true"></i>
+          <h3>建造时间轴</h3>
+          <span class="pct" id="buildPct">竣工 100%</span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="pb" id="pBuildBody">
+          <div class="buildstage" id="buildStage" role="list">
+            <button data-phase="0" class="on" aria-label="阶段 1 基础与场地"><b>01</b><span>基础</span></button>
+            <button data-phase="1" aria-label="阶段 2 看台与环廊"><b>02</b><span>看台</span></button>
+            <button data-phase="2" aria-label="阶段 3 屋盖与结构"><b>03</b><span>屋盖</span></button>
+            <button data-phase="3" aria-label="阶段 4 立面与室内"><b>04</b><span>立面</span></button>
+            <button data-phase="4" aria-label="阶段 5 竣工"><b>05</b><span>竣工</span></button>
+          </div>
+          <div class="sliderrow">
+            <label for="rgBuild">建造进度</label>
+            <input type="range" id="rgBuild" min="0" max="100" value="100" aria-label="建造进度 0 到 100" />
+            <b id="buildVal">100%</b>
+          </div>
+          <div class="builddesc" id="buildDesc">全部构件就位 · 竣工状态</div>
+          <button class="btn xs wide ghost" id="btnBuildPlay" aria-pressed="false">▶ 播放建造动画</button>
+        </div>
+      </section>
+
+      <!-- v4：三表 / 每日挑战 / 印章 —— 重复可玩的外壳 -->
+      <section class="panel" id="pContest" data-panel="contest" data-title="成绩与挑战">
+        <button class="ph" type="button" aria-expanded="true" aria-controls="pContestBody">
+          <i class="ic ic-c" aria-hidden="true"></i>
+          <h3>成绩与挑战</h3>
+          <span class="pct" id="contestPct">—</span>
+          <svg class="chev" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="pb" id="pContestBody">
+          <div class="dailytop">
+            <span class="dailydate" id="dailyDate">今日挑战</span>
+            <span class="dailypct" id="dailyPct">0/3</span>
+          </div>
+          <ul class="dailyitems" id="dailyItems" role="list"></ul>
+          <div class="medalrow" id="contestMedals" role="list" aria-label="三表徽章"></div>
+          <div class="stampgrid" id="stampGrid" role="list" aria-label="建筑印章"></div>
+          <div class="pbnote" id="stampHelp">印章是你在潮汐场做过的事的凭证。</div>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- ───── 底部 ───── -->
+  <footer class="bottom" id="bottom">
+    <div class="shots" id="shotList" role="group" aria-label="机位"></div>
+    <div class="modes">
+      <button class="btn" id="btnTour" aria-pressed="false" aria-label="自动导览">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+        <em>导览</em>
+      </button>
+      <button class="btn" id="btnWalk" aria-pressed="false" aria-label="第一人称漫游">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="13" cy="4.5" r="2" fill="currentColor"/><path d="M10 8l3 1 1 4 2 3M10 8L8 12l-2 1M13 13l-2 3-2 4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+        <em>漫游</em>
+      </button>
+      <button class="btn" id="btnStory" aria-pressed="false" aria-label="建造逻辑演示">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <em>建造逻辑</em>
+      </button>
+      <button class="btn" id="btnPhoto" aria-pressed="false" aria-label="照片模式">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="3" y="6.5" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="13" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 6.5L10 4h4l1.5 2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+        <em>照片</em>
+      </button>
+      <button class="btn" id="btnReset" aria-label="复位全部视图">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M4 4v4.2h4.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <em>复位</em>
+      </button>
+    </div>
+  </footer>
+
+  <!-- ───── 小地图 + 罗盘 + 指引 ───── -->
+  <div id="mmWrap" class="mmwrap" aria-hidden="false">
+    <div class="mm-head"><span>平面导向</span><b id="mmState">俯瞰</b></div>
+    <div class="mm-body">
+      <canvas id="mm" width="150" height="150" role="img" aria-label="场馆俯视小地图，含玩家位置与朝向"></canvas>
+      <div class="compass" id="compass" role="img" aria-label="罗盘，指向北">
+        <div class="compass-dial" id="compassDial">
+          <b>N</b><b>E</b><b>S</b><b>W</b>
+          <i class="needle"></i>
+        </div>
+      </div>
+    </div>
+    <div class="mm-foot">
+      <span id="mmPos">X 0 · Z 0</span><span id="mmYaw">000°</span>
+    </div>
+  </div>
+
+  <div class="guide" id="gWrap">
+    <div class="garrow" id="gArrow" aria-hidden="true">
+      <svg viewBox="0 0 40 40" width="36" height="36"><path d="M20 4l10 22-10-5-10 5z" fill="currentColor"/></svg>
+    </div>
+    <div class="gtxt"><b id="gName">最近徽章</b><span id="gDist">—</span></div>
+  </div>
+
+  <!-- ───── 构件信息卡 ───── -->
+  <div id="hintCard" class="hintcard" role="dialog" aria-label="构件信息" hidden>
+    <header>
+      <i class="hk" aria-hidden="true"></i>
+      <b id="hcTitle">构件名称</b>
+      <button class="xc" id="hcClose" aria-label="关闭构件信息卡">✕</button>
+    </header>
+    <div class="hc-spec" id="hcSpec">规格</div>
+    <div class="hc-data" id="hcData"></div>
+    <div class="hc-btns">
+      <button class="btn xs" id="hcFocus" aria-label="对焦该构件">对焦</button>
+      <button class="btn xs ghost" id="hcHide" aria-label="隐藏该构件">隐藏</button>
+      <button class="btn xs ghost" id="hcSolo" aria-label="孤立该构件">孤立</button>
+    </div>
+  </div>
+
+  <!-- ───── 照片模式面板 ───── -->
+  <div id="photoBar" class="photobar" hidden aria-label="照片模式控制">
+    <div class="pbrand"><i aria-hidden="true"></i>照片模式<em>PHOTO MODE</em></div>
+    <div class="pslider">
+      <label for="rgExposure">曝光</label>
+      <input type="range" id="rgExposure" min="-1.2" max="1.2" step="0.05" value="0" />
+      <b id="expoVal">0.0</b>
+    </div>
+    <div class="pslider">
+      <label for="rgFocal">焦距</label>
+      <input type="range" id="rgFocal" min="18" max="85" step="1" value="42" />
+      <b id="focalVal">42mm</b>
+    </div>
+    <div class="pslider">
+      <label for="rgAperture">光圈</label>
+      <input type="range" id="rgAperture" min="1.2" max="16" step="0.1" value="8" />
+      <b id="apertureVal">f/8</b>
+    </div>
+    <div class="pfilters" id="pFilters" role="group" aria-label="滤镜">
+      <button data-filter="none" class="on" aria-pressed="true">原色</button>
+      <button data-filter="warm" aria-pressed="false">暖调</button>
+      <button data-filter="mono" aria-pressed="false">黑白</button>
+      <button data-filter="cyan" aria-pressed="false">青调</button>
+    </div>
+    <div class="pscore" id="pScore" aria-live="polite">
+      <span class="psg">构图</span>
+      <b id="psVal">—</b>
+      <span class="psg" id="psGrade">评级 —</span>
+      <span class="psb" id="psBest">最高 —</span>
+    </div>
+    <div class="pacts">
+      <button class="btn xs ghost" id="btnPhotoHide" aria-pressed="false" aria-label="隐藏界面以便取景">隐藏界面</button>
+      <button class="btn xs" id="btnSnap" aria-label="保存截图 PNG">保存 PNG</button>
+      <button class="btn xs ghost" id="btnPhotoExit" aria-label="退出照片模式">退出</button>
+    </div>
+  </div>
+
+  <!-- ───── 漫游摇杆（触屏） ───── -->
+  <div id="joy" class="joy" hidden aria-hidden="true">
+    <div class="joy-base"><i class="joy-knob" id="joyKnob"></i></div>
+  </div>
+  <div id="touchLook" class="touchlook" hidden aria-label="拖拽转动视角"></div>
+
+  <!-- ───── 手机底部操作栏 ───── -->
+  <div id="mobBar" class="mobbar" aria-label="快捷操作">
+    <button class="mbtn" id="mBtnShots" aria-label="机位列表">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h4l1.5-2h5L16 7h4v12H4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+      <em>机位</em>
+    </button>
+    <button class="mbtn" id="mBtnQuest" aria-label="打开探索任务"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.2 4.3L19 6.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><em>任务</em></button>
+    <button class="mbtn" id="mBtnCap" aria-label="打开容量仪表"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 19V9M9.3 19V5M14.7 19v-7M20 19v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><em>容量</em></button>
+    <button class="mbtn" id="mBtnFlow" aria-label="打开疏散面板"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 17l4-5 3 2.5 3-6 4 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><em>疏散</em></button>
+    <button class="mbtn" id="mBtnView" aria-label="打开表达方式"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3l8 4.6v8.8L12 21l-8-4.6V7.6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><em>表达</em></button>
+    <button class="mbtn" id="mBtnLayer" aria-label="打开构件图层"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 4l8 4-8 4-8-4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 12l8 4 8-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><em>图层</em></button>
+    <button class="mbtn" id="mBtnWalk" aria-label="进入第一人称漫游"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="13" cy="4.5" r="2" fill="currentColor"/><path d="M10 8l3 1 1 4 2 3M10 8L8 12l-2 1M13 13l-2 3-2 4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg><em>漫游</em></button>
+  </div>
+
+  <div id="toastWrap" aria-live="polite" aria-atomic="false"></div>
+  <div id="srLive" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="hoverTip" aria-hidden="true"></div>
+  <div id="walkHint" class="hidden">
+    <b>W A S D</b> 移动 · <b>Shift</b> 加速 · <b>鼠标</b> 转头 · <b>R</b> 自动巡游 · <b>Esc</b> 退出
+  </div>
+  <div id="levelUp" class="levelup" aria-hidden="true">
+    <div class="lu-ring"></div>
+    <b>LEVEL <span id="luLv">2</span></b>
+    <em>探索等级提升</em>
+  </div>
+</div>
+
+<!-- ══════════ 帮助 ══════════ -->
+<div id="help" class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle" aria-hidden="true">
+  <div class="sheet-in">
+    <header><h2 id="helpTitle">操作说明</h2><button class="x" id="helpClose" aria-label="关闭帮助">✕</button></header>
+    <div class="helpgrid">
+      <div>
+        <h4>相机</h4>
+        <ul>
+          <li><kbd>左键拖动</kbd> 环绕</li>
+          <li><kbd>右键拖动</kbd> 平移</li>
+          <li><kbd>滚轮</kbd> 推拉</li>
+          <li><kbd>1</kbd>–<kbd>7</kbd> 切换机位</li>
+          <li><kbd>P</kbd> 自动导览</li>
+        </ul>
+      </div>
+      <div>
+        <h4>表达</h4>
+        <ul>
+          <li><kbd>N</kbd> 昼夜切换</li>
+          <li><kbd>M</kbd> 材质 / 白模 / X 光</li>
+          <li><kbd>E</kbd> 分层拆解</li>
+          <li><kbd>X</kbd> 剖切</li>
+          <li><kbd>V</kbd> 俯视</li>
+        </ul>
+      </div>
+      <div>
+        <h4>探索</h4>
+        <ul>
+          <li><kbd>F</kbd> 进入 / 退出漫游</li>
+          <li><kbd>W A S D</kbd> 行走</li>
+          <li><kbd>Shift</kbd> 加速</li>
+          <li><kbd>R</kbd> 自动巡游路线</li>
+          <li><kbd>鼠标</kbd> 转头（锁定指针）</li>
+        </ul>
+      </div>
+      <div>
+        <h4>构件与游戏</h4>
+        <ul>
+          <li><kbd>单击</kbd> 选中构件 · 信息卡</li>
+          <li><kbd>双击</kbd> 孤立显示</li>
+          <li><kbd>右键</kbd> 隐藏构件</li>
+          <li><kbd>F</kbd> 对焦（漫游中时为进出）</li>
+          <li><kbd>C</kbd> 照片模式 ｜ <kbd>Tab</kbd> 键盘导航</li>
+        </ul>
+      </div>
+      <div>
+        <h4>关于本方案</h4>
+        <ul class="about">
+          <li>四潮八柱 · 鞍面悬浮：开敞式专业足球场，无跑道、场地上方无遮盖</li>
+          <li id="abRows">三层看台 64 排 + 3 层环廊 + 包厢层，屋盖径向桁架悬挑</li>
+          <li id="abSeat">观众席 80,184 座，逐排逐区精确统计（MODEL 同源）</li>
+          <li>疏散按 60 个观众分区 / 4 主入口 + 8 次入口模拟</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 设置 ══════════ -->
+<div id="settings" class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle" aria-hidden="true">
+  <div class="sheet-in narrow">
+    <header><h2 id="setTitle">设置</h2><button class="x" id="setClose" aria-label="关闭设置">✕</button></header>
+    <div class="setrow">
+      <label>画质</label>
+      <div class="seg" id="segQuality" role="group" aria-label="画质">
+        <button data-q="low" aria-pressed="false">低</button>
+        <button data-q="mid" aria-pressed="false">中</button>
+        <button data-q="high" class="on" aria-pressed="true">高</button>
+      </div>
+    </div>
+    <div class="setrow">
+      <label for="tgSound">环境音效</label>
+      <button class="switch" id="tgSound" role="switch" aria-checked="false" aria-label="环境音效"><i></i></button>
+    </div>
+    <div class="setrow">
+      <label for="tgMotion">减少动态</label>
+      <button class="switch" id="tgMotion" role="switch" aria-checked="false" aria-label="减少动态效果"><i></i></button>
+    </div>
+    <div class="setrow">
+      <label for="tgQualityAuto">自动降质</label>
+      <button class="switch on" id="tgQualityAuto" role="switch" aria-checked="true" aria-label="低帧率时自动降质"><i></i></button>
+    </div>
+    <div class="setrow">
+      <label for="tgPerf">省电模式</label>
+      <button class="switch" id="tgPerf" role="switch" aria-checked="false" aria-label="省电模式：降分辨率并关闭泛光"><i></i></button>
+    </div>
+    <p class="setnote">系统检测到 <b id="setSysMotion">未开启</b>「减少动态」偏好时，将自动降低过渡动画。<br />
+      卡顿时先开<b>省电模式</b>（渲染分辨率减半、关泛光与阴影投影，实测帧率可翻倍），
+      再按 <kbd>Shift</kbd>+<kbd>P</kbd> 看右下角诊断面板确认用的是不是独立显卡。</p>
+  </div>
+</div>
+
+<!-- ══════════ 启动自检：失败/超时都要给出可操作的提示，绝不静默卡在加载页 ══════════ -->
+<script>
+(function () {
+  var errs = [], settled = false;
+  function push(msg) { errs.push(String(msg).slice(0, 300)); if (errs.length > 6) errs.shift(); }
+
+  window.addEventListener('error', function (e) {
+    if (e && e.target && e.target.tagName) push('资源加载失败：' + (e.target.src || e.target.href));
+    else push((e && e.message) || '未知脚本错误');
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    push('Promise 未处理：' + ((e.reason && (e.reason.message || e.reason)) || 'unknown'));
+  });
+
+  function webgl2() {
+    try {
+      var c = document.createElement('canvas');
+      return !!(window.WebGL2RenderingContext && c.getContext('webgl2'));
+    } catch (err) { return false; }
+  }
+
+  function panel(title, lines, actionLabel) {
+    var ld = document.getElementById('loader');
+    if (!ld) return;
+    settled = true;
+    ld.classList.remove('off');
+    ld.innerHTML =
+      '<div class="ld-inner" style="max-width:620px">' +
+      '<div class="ld-title" style="font-size:26px">' + title + '</div>' +
+      '<div style="margin:18px 0;padding:16px 18px;border:1px solid rgba(232,192,122,.35);' +
+      'border-radius:10px;background:rgba(232,192,122,.06);text-align:left;line-height:1.9;' +
+      'font:13px/1.9 ui-monospace,Menlo,Consolas,monospace;color:#cfd6de;white-space:pre-wrap">' +
+      lines.join('\n') + '</div>' +
+      (actionLabel
+        ? '<button id="ldRetry" style="cursor:pointer;padding:10px 22px;border-radius:999px;' +
+          'border:1px solid #e8c07a;background:rgba(232,192,122,.12);color:#e8c07a;' +
+          'font:13px/1 inherit;letter-spacing:.08em">' + actionLabel + '</button>'
+        : '') +
+      '</div>';
+    var btn = document.getElementById('ldRetry');
+    if (btn) btn.onclick = function () { location.reload(); };
+  }
+
+  /* 1) file:// 直接打开：ES 模块被 CORS 拦死，必然白屏/卡加载页 */
+  if (location.protocol === 'file:') {
+    document.addEventListener('DOMContentLoaded', function () {
+      panel('需要用本地服务器打开', [
+        '当前是以 file:// 方式打开的，浏览器的模块安全策略会拒绝加载脚本。',
+        '',
+        '请在项目目录执行任意一种：',
+        '  · python -m http.server 8099',
+        '  · npx serve -l 8099',
+        '  · node tools/serve.cjs 8099   （项目自带）',
+        '',
+        '然后访问  http://127.0.0.1:8099/',
+      ]);
+    });
+    return;
+  }
+
+  /* 2) 超时看门狗：12s 还没就绪就说明真的卡住了，把原因摊开给人看 */
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () {
+      if (settled || window.__ready) return;
+      var lines = [
+        '已等待 12 秒仍未完成初始化。',
+        '',
+        'WebGL2 支持：' + (webgl2() ? '是' : '否 ← 这是关键，需要开启硬件加速'),
+        '页面地址：' + location.href,
+      ];
+      if (!webgl2()) {
+        lines.push('', '处理办法：', '  · Chrome/Edge → 设置 → 系统 → 开启「使用硬件加速」',
+          '  · 或在地址栏打开 chrome://gpu 查看 WebGL 状态');
+      } else {
+        lines.push('', '可能是显卡较慢（首次需要编译大量着色器），可以直接降画质重试。');
+      }
+      if (errs.length) lines.push('', '捕获到的错误：', '  · ' + errs.join('\n  · '));
+      var ld = document.getElementById('loader');
+      if (ld) panel('加载超时', lines, '以低画质重试');
+      try { localStorage.setItem('tidal_lowq', '1'); } catch (e) {}
+    }, 12000);
+  });
+})();
+</script>
+
+<script type="module" src="./src/bundle.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# dsh bundle patch — mounted by `dsh plugin add` / by the profile's cordis.patch.yml row.
+# 本插件没有任何运行时入口（纯 CLI），因此 patch 里只声明一个空行占位，
+# 让 profile 的 loader 能按名字解析到本包。
+- insert:
+    - id: session-recover
+      name: 'dsh-session-recover'
+      config: {}

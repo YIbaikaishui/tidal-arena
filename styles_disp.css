@@ -1,0 +1,68 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   潮汐调度台（疏散策略面板）
+   ═══════════════════════════════════════════════════════════════════════ */
+.disp{
+  margin-top:11px;padding:10px 10px 9px;
+  border:1px solid var(--line);border-radius:var(--r);
+  background:linear-gradient(180deg,rgba(111,211,224,.055),rgba(255,255,255,.012));
+}
+.disp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.disp-head .dl{
+  font-family:var(--disp);font-size:12px;letter-spacing:.18em;color:var(--cyan);
+}
+.teams{
+  position:relative;display:flex;align-items:center;gap:6px;
+  min-width:86px;height:18px;padding:0 7px;
+  border:1px solid var(--line);border-radius:9px;overflow:hidden;
+  background:rgba(0,0,0,.3);
+}
+.teams i{
+  position:absolute;left:0;top:0;bottom:0;width:66%;
+  background:linear-gradient(90deg,rgba(111,211,224,.55),rgba(111,211,224,.28));
+  transition:width .25s ease;
+}
+.teams b{
+  position:relative;font-family:var(--mono);font-size:10.5px;
+  color:var(--tx);letter-spacing:.04em;
+}
+.teams.full i{background:linear-gradient(90deg,rgba(224,169,75,.5),rgba(224,169,75,.24))}
+.disp-hint{
+  margin:0 0 8px;font-size:10.5px;line-height:1.5;color:var(--tx3);
+}
+.exits{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px;
+}
+.xbtn{
+  position:relative;display:grid;gap:1px;
+  padding:5px 4px 4px;border-radius:2px;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.028);
+  color:var(--tx2);text-align:left;transition:.16s;
+}
+.xbtn:hover{border-color:var(--gold-dim);background:rgba(232,192,122,.08)}
+.xbtn .xn{font-size:10.5px;letter-spacing:.04em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xbtn .xs{font-family:var(--mono);font-size:8.5px;color:var(--tx3);letter-spacing:.02em}
+.xbtn .xd{
+  position:absolute;right:3px;top:3px;width:6px;height:6px;border-radius:50%;
+  background:#6b7785;box-shadow:none;transition:.2s;
+}
+.xbtn.on{border-color:rgba(95,191,138,.5);background:rgba(95,191,138,.10);color:var(--tx)}
+.xbtn.on .xd{background:#5fbf8a;box-shadow:0 0 7px #5fbf8a}
+.xbtn.hot{border-color:rgba(226,96,63,.6);background:rgba(226,96,63,.12)}
+.xbtn.hot .xd{background:#e2603f;box-shadow:0 0 7px #e2603f}
+.xbtn.swap{border-color:rgba(224,169,75,.6);background:rgba(224,169,75,.12)}
+.xbtn.swap .xd{background:#e0a94b;box-shadow:0 0 7px #e0a94b}
+.xbtn.main .xn{color:var(--gold2)}
+.xbtn[disabled]{opacity:.42;cursor:not-allowed}
+.quads{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.quad{display:grid;gap:3px}
+.quad .ql{font-size:9.5px;color:var(--tx3);letter-spacing:.08em}
+.quad .qb{height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}
+.quad .qb i{display:block;height:100%;width:0;background:#5fbf8a;transition:width .2s ease,background .2s}
+.flowrow2 .grade{
+  font-family:var(--disp);font-size:12px;letter-spacing:.12em;color:var(--gold);
+  margin-left:auto;
+}
+.flowrow2 .fin{font-size:10px;color:var(--tx3);margin-left:6px}
+@media (max-width:420px){
+  .exits{grid-template-columns:repeat(3,1fr)}
+}

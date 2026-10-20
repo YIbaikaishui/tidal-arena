@@ -1,0 +1,27 @@
+{
+  "name": "dsh-session-recover",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CLI: 检查并抢救损坏的 DSH 会话日志 (session.v4.jsonl.zstd 拼接帧容器)",
+  "main": "recover.mjs",
+  "exports": {
+    ".": "./recover.mjs",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "dsh-session-recover": "bin.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "bin.mjs",
+    "recover.mjs",
+    "cordis.patch.yml",
+    "README.zh.md"
+  ],
+  "license": "MIT"
+}

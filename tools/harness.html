@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>HUD HARNESS</title>
+<link rel="stylesheet" href="../styles.css" />
+<script type="importmap">
+{ "imports": { "three": "../vendor/build/three.module.js", "three/addons/": "../vendor/examples/jsm/" } }
+</script>
+<script>
+/* 测试夹具：在真实 index.html 的 DOM 上，用 mock ctx 直接跑 buildUI()，
+   以便在游戏层（arena/app）被并行重写、暂时无法启动时验证 HUD 本身。
+   仅用于 tools 测试，不属于交付物。 */
+window.__harness = true;
+</script>
+</head>
+<body>
+<script>
+(async function () {
+  /* 1) 取出真实 index.html 的 body 结构（剔除 app.js 脚本与 loader 之外的覆盖） */
+  const html = await (await fetch('../index.html?raw=' + Date.now())).text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script').forEach((s) => s.remove());
+  document.head.insertAdjacentHTML('beforeend', '<style>' + '' + '</style>');
+  document.title = 'HARNESS';
+  // 替换 body 内容
+  document.body.innerHTML = doc.body.innerHTML;
+  // 保留 styles.css 链接（已在 head）
+
+  /* 2) mock 依赖 */
+  const THREE = await import('../vendor/build/three.module.js');
+  window.THREE = THREE;
+  const app = { THREE, ready: false };
+  window.__app = app;
+
+  const canvas = document.getElementById('gl');
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  try {
+    const r = new THREE.WebGLRenderer({ canvas, antialias: false });
+    r.setSize(innerWidth, innerHeight, false);
+    r.setClearColor(0x070b11, 1);
+    app.renderer = r;
+  } catch (e) { console.warn('no gl', e); }
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 9000);
+  camera.position.set(0, 260, 320);
+  camera.lookAt(0, 12, 0);
+
+  /* 简易场馆方块群：按 ent 分组 */
+  const root = new THREE.Group();
+  const groups = {};
+  const ents = {};
+  const mk = (name, w, h, d, x, y, z, color) => {
+    const g = new THREE.Group(); g.name = name;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, roughness: .8 }));
+    m.position.set(x, y, z); m.name = name + '-mesh';
+    g.add(m); root.add(g); groups[name] = g;
+    ents[name] = { id: name, mesh: g, parent: root, hidden: false, label: name + ' 构件', spec: w + ' × ' + h + ' × ' + d + ' m' };
+    return g;
+  };
+  mk('pitch', 105, 0.2, 68, 0, 0, 0, 0x3f6b34);
+  mk('bowl', 230, 30, 300, 0, 12, 0, 0xc9a15f);
+  mk('concourse', 250, 6, 320, 0, 24, 0, 0x8fb6c4);
+  mk('facade', 262, 40, 332, 0, 20, 0, 0xb9b3a8);
+  mk('roof', 300, 3, 380, 0, 48, 0, 0x9aa4ae);
+  mk('structure', 290, 12, 370, 0, 42, 0, 0x777f88);
+  mk('interior', 200, 14, 260, 0, 8, 0, 0x5b4a73);
+  mk('glow', 268, 1, 338, 0, 40, 0, 0x6fd3e0);
+  mk('site', 900, 0.1, 900, 0, -1.2, 0, 0x2b3a2b);
+  const seats = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.5, 0.4), new THREE.MeshStandardMaterial({ color: 0xd8b478 }), 2000);
+  const mm4 = new THREE.Matrix4();
+  for (let i = 0; i < 2000; i++) {
+    const a = (i / 2000) * Math.PI * 2;
+    mm4.makeTranslation(Math.cos(a) * 120, 14 + (i % 60) * .18, Math.sin(a) * 160);
+    seats.setMatrixAt(i, mm4);
+  }
+  root.add(seats);
+  ents.seats = { id: 'seats', mesh: seats, parent: root, label: '座椅阵列', spec: '80,000 席 · 实例化' };
+  scene.add(root);
+  scene.background = new THREE.Color(0x070b11);
+  const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(200, 300, 120); scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0x8899bb, 0x222222, 1.2));
+
+  const arena = { root, groups, ents, M: {}, seatInst: null, lamps: [], }
+;
+  arena.focusOn = async (id) => { app.orbit.set({ target: new THREE.Vector3() }); };
+  arena.setSolo = () => {};
+  arena.setVisible = (id, v) => { if (ents[id] && ents[id].mesh) ents[id].mesh.visible = v; };
+
+  /* orbit / walk / draft / modes / fx / sky */
+  const orbit = {
+    target: new THREE.Vector3(0, 16, 0), tTarget: new THREE.Vector3(0, 16, 0),
+    dist: 520, tDist: 520, az: -1.3, tAz: -1.3, elv: .4, tElv: .4,
+    enabled: true, minDist: 8, maxDist: 1600,
+    set(o) { if (o.target) { this.tTarget.copy(o.target); this.target.copy(o.target); }
+      if (o.dist != null) this.tDist = this.dist = o.dist;
+      if (o.az != null) this.tAz = this.az = o.az;
+      if (o.el != null) this.tElv = this.elv = o.el; this.apply(); },
+    snapTo(o) { this.set(o); }, stopAuto() {}, startAuto() {},
+    update() { this.apply(); },
+    apply() {
+      const c = this.target, ce = Math.cos(this.elv), se = Math.sin(this.elv);
+      camera.position.set(c.x + Math.cos(this.az) * ce * this.dist, Math.max(.6, c.y + se * this.dist), c.z + Math.sin(this.az) * ce * this.dist);
+      camera.lookAt(c);
+    },
+  };
+  const walk = { active: false, pos: new THREE.Vector3(0, 1.68, 140), yaw: Math.PI, pitch: 0,
+    start(p) { this.active = true; if (p) this.pos.copy(p); }, stop() { this.active = false; }, update() {} };
+
+  const ortho = () => { const c = new THREE.OrthographicCamera(-200, 200, 200, -200, 1, 4000); c.position.set(0, 600, 0.01); c.lookAt(0, 0, 0); return c; };
+  const cams = { plan: ortho(), front: ortho(), left: ortho(), section: ortho() };
+  const draft = { get: (k) => cams[k] || cams.plan, fit() {} };
+  const modes = {
+    setMode(m) { app.mode = m; }, setExplode(v) { app.explode = v; },
+    setSection(on, n, c) { app.section = on; }, setLayer() {}, update() {},
+  };
+  const fx = { exposureBoost: 1, bloomEnabled: true, setDraft() { app.draft = true; }, setDraftCamera() {},
+    flash() {}, render(dt) { if (app.renderer) { app.renderer.render(scene, app.stage.camera); } },
+    bloom: { strength: .3 }, setQuality() { app.quality = true; } };
+  const sky = { update() {} };
+  const env = { root: groups.site, update() {} };
+  // site 移出 arena.root 模拟 env
+  scene.remove(groups.site); scene.add(groups.site);
+  delete ents.site;
+
+  const stage = { renderer: app.renderer, scene, camera, canvas, quality: 'high', W: innerWidth, H: innerHeight, pr: 1 };
+
+  /* 3) 跑 buildUI */
+  const { buildUI } = await import('../src/ui.js');
+  const ui = buildUI({ arena, env, sky, fx, orbit, walk, draft, stage, modes });
+  app.ui = ui; app.orbit = orbit; app.walk = walk; app.arena = arena; app.stage = stage;
+  app.modes = modes; app.fx = fx;
+
+  // 模拟游戏层（window.__game）可选
+  window.__game = null;
+
+  document.getElementById('loader').classList.add('off');
+  document.getElementById('hud').classList.add('on');
+  ui.postBoot && ui.postBoot();
+
+  let t = 0, last = performance.now(), frames = 0, fps = 60, acc = 0;
+  function frame() {
+    requestAnimationFrame(frame);
+    const n = performance.now(); const dt = Math.min(.1, (n - last) / 1000); last = n; t += dt; acc += dt; frames++;
+    if (acc > .5) { fps = frames / acc; window.__fps = fps; acc = 0; frames = 0; }
+    orbit.update(dt); ui.update(dt, t, fps);
+    if (app.renderer) app.renderer.render(scene, stage.camera);
+  }
+  stage.onResize = () => {
+    if (!app.renderer) return;
+    app.renderer.setSize(innerWidth, innerHeight, false);
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  };
+  addEventListener('resize', stage.onResize);
+  ui.INTRO && orbit.snapTo(ui.INTRO);
+  requestAnimationFrame(frame);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

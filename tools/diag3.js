@@ -1,0 +1,16 @@
+const { chromium } = require('playwright-core');
+(async () => {
+  const CHROME = 'C:/Users/zhang/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe';
+  const b = await chromium.launch({ executablePath: CHROME, args:['--use-gl=angle','--use-angle=d3d11'] });
+  const pg = await b.newPage({ viewport: { width: 1000, height: 640 } });
+  await pg.goto('http://127.0.0.1:8099/index.html', { waitUntil: 'load' });
+  await pg.waitForFunction('window.__ready === true', null, { timeout: 120000 });
+  await pg.waitForTimeout(800);
+  await pg.evaluate(()=>{ document.querySelectorAll('#hud').forEach(e=>e.style.display='none');
+    const A=window.__app.arena; const ks=['core','tier1','tier2','seats','facadeBase','facadeUpper','cornice','roof','roofSoffit'];
+    A.root.traverse(o=>{ if(o.name && A.ents[o.name]) { o.visible = ks.includes(o.name); } });
+  });
+  await pg.waitForTimeout(500);
+  await pg.screenshot({ path: 'shots/d-sub.png' });
+  await b.close();
+})();

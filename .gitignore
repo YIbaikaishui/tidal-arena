@@ -1,0 +1,25 @@
+# 依赖（都是本地安装的可复现依赖，不入库）
+node_modules/
+tools/node_modules/
+tools/pw.tgz
+
+# 临时脚本 / 一次性调试产物（下划线开头的是过程中随手写的探针）
+_bloom.cjs
+_put.cjs
+chkdepth*.js
+v4_ui.cjs
+tools/_*
+tools/shots/
+
+# 验收/比对用的截图（单张 1~2MB，合计 250MB+，不进仓库；需要时本地重跑探针生成）
+*.png
+*.jpg
+*.jpeg
+*.webp
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+*.log
+Thumbs.db
+.DS_Store

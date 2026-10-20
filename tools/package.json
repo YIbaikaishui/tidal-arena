@@ -1,0 +1,19 @@
+{
+  "name": "tidal-arena-tools",
+  "version": "4.0.0",
+  "private": true,
+  "description": "潮汐场 TIDAL ARENA 的打包 / 静态服务 / 验收探针",
+  "scripts": {
+    "watch": "node bundle.cjs --watch",
+    "build": "node bundle.cjs",
+    "serve": "node serve.cjs",
+    "v4": "node v4_probe.cjs"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "playwright-core": "file:pw.tgz"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5"
+  }
+}
