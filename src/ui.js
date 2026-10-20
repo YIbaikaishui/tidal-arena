@@ -1366,6 +1366,23 @@ export function buildUI(ctx) {
   }
   $('#tgPerf') && $('#tgPerf').addEventListener('click', () => setPerfMode(!S.perf));
 
+  /* 轻量模式：几何在启动时构建，切换后要刷新才彻底生效 */
+  S.lite = !!(stage && stage.lite);
+  {
+    const tl = $('#tgLite');
+    if (tl) { tl.classList.toggle('on', S.lite); setAttr(tl, 'aria-checked', S.lite ? 'true' : 'false'); }
+  }
+  $('#tgLite') && $('#tgLite').addEventListener('click', () => {
+    const next = !S.lite;
+    S.lite = next;
+    const tl = $('#tgLite');
+    if (tl) { tl.classList.toggle('on', next); setAttr(tl, 'aria-checked', next ? 'true' : 'false'); }
+    if (window.__setLiteMode) window.__setLiteMode(next);
+    toast(next ? '已开启轻量模式' : '已关闭轻量模式',
+      next ? '坐席与绿化减量、关泛光，刷新后完全生效' : '恢复完整细节，刷新后生效', 'plain');
+    say(next ? '轻量模式已开启（刷新后完全生效）' : '轻量模式已关闭（刷新后生效）');
+  });
+
   /* ══════════ 面板折叠 / 抽屉 ══════════════ */
   function setPanelOpen(panel, open) {
     panel.dataset.open = open ? '1' : '0';
@@ -2137,7 +2154,9 @@ export function buildUI(ctx) {
 
   function update(dt, t, fps) {
     /* 低帧率自适应（可关闭） */
-    if (S.autoQuality && !S._qBusy) {
+    /* 自动降质：轻量/省电档已经在渲染端做过降压，这里不再叠一层，
+       否则会和 app.js 主循环里的 fnLog 互相打架，把画质反复往下推。 */
+    if (S.autoQuality && !S._qBusy && !(stage && (stage.lite || stage.perf))) {
       S._qSample = (S._qSample || 0) + dt;
       if (S._qSample > 2.5) {
         S._qSample = 0;

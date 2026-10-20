@@ -7,9 +7,21 @@ import * as THREE from 'three';
 
 const CV = (w, h) => {
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
+  c.width = Math.max(2, Math.round(w));
+  c.height = Math.max(2, Math.round(h));
   return c;
 };
+
+/* ══════════════ 纹理分辨率缩放 ══════════════
+   setTextureScale(0.5) 让所有程序化纹理按一半尺寸生成。
+   「轻量模式」靠它把首屏的 Canvas 绘制与上传开销直接砍掉近 3/4
+   （实测 2048×1400 的草皮贴图单独就要 ~200ms，全量纹理合计约 0.6~1.2s）。
+   必须在任何纹理生成函数被调用之前设置。 */
+let TEX_SCALE = 1;
+export function setTextureScale(s) { TEX_SCALE = Math.min(1, Math.max(0.25, s || 1)); }
+export function getTextureScale() { return TEX_SCALE; }
+const SZ = (w) => Math.max(2, Math.round(w * TEX_SCALE));
+
 const TEX = (cv, { srgb = true, wrap = THREE.ClampToEdgeWrapping, aniso = 8 } = {}) => {
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -30,7 +42,7 @@ function rnd(seed) {
 
 /* ══════════════ 草皮：割草条纹 + 场地标线 ══════════════ */
 export function pitchTexture() {
-  const W = 2048, H = 1400;
+  const W = SZ(2048), H = SZ(1400);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   const R = rnd(20260611);
   const padX = 6, padZ = 6;
@@ -101,7 +113,7 @@ export function pitchTexture() {
 
 /* ══════════════ LED 广告板 ══════════════ */
 export function adBoardTexture() {
-  const W = 2048, H = 96;
+  const W = SZ(2048), H = SZ(96);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   ctx.fillStyle = '#0a0c10'; ctx.fillRect(0, 0, W, H);
   const brands = ['TIDAL ARENA', 'WORLD CUP 2026', '潮汐场', 'LIVE', 'FIFA WORLD CUP', 'TIDAL'];
@@ -122,7 +134,7 @@ export function adBoardTexture() {
 
 /* ══════════════ 现场大屏 ══════════════ */
 export function screenTexture() {
-  const W = 1024, H = 512;
+  const W = SZ(1024), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   const draw = (state = {}) => {
     const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -172,7 +184,7 @@ function noiseFill(ctx, W, H, amp, base) {
 const clamp255 = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
 
 export function stoneTextures() {
-  const W = 512, H = 512;
+  const W = SZ(512), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   ctx.fillStyle = '#e8e1d3'; ctx.fillRect(0, 0, W, H);
   // 石材分缝
@@ -190,7 +202,7 @@ export function stoneTextures() {
 }
 
 export function aluTextures() {
-  const W = 128, H = 512;
+  const W = SZ(128), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   const g = ctx.createLinearGradient(0, 0, W, 0);
   g.addColorStop(0, '#8b959f'); g.addColorStop(0.35, '#dfe6ec');
@@ -204,7 +216,7 @@ export function aluTextures() {
 }
 
 export function concreteTexture() {
-  const W = 256, H = 256;
+  const W = SZ(256), H = SZ(256);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   ctx.fillStyle = '#b5afa4'; ctx.fillRect(0, 0, W, H);
   noiseFill(ctx, W, H, 30);
@@ -217,7 +229,7 @@ export function concreteTexture() {
 
 /* ══════════════ 立面夜景窗光（用于夜里外立面透光） ══════════════ */
 export function facadeNightTexture() {
-  const W = 1024, H = 512;
+  const W = SZ(1024), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, H);
   // 环廊长窗的光带
@@ -243,7 +255,7 @@ export function facadeNightTexture() {
 
 /* ══════════════ 广场花岗岩放射铺装（极坐标：u = 环向/8.5m，v = 径向/8.5m） ══════════════ */
 export function plazaTexture() {
-  const W = 1024, H = 512;
+  const W = SZ(1024), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   const R = rnd(7713);
   // 两种暖灰花岗岩
@@ -277,7 +289,7 @@ export function plazaTexture() {
 
 /* ══════════════ 沥青 + 车道线（u = 横向 /26m，v = 纵向 /40m） ══════════════ */
 export function asphaltTexture() {
-  const W = 512, H = 512;
+  const W = SZ(512), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   const R = rnd(3311);
   ctx.fillStyle = '#3b3d40'; ctx.fillRect(0, 0, W, H);
@@ -309,7 +321,7 @@ export function asphaltTexture() {
 
 /* ══════════════ 草地 / 草坪（细腻斑驳，用于绿地和草坡） ══════════════ */
 export function grassTexture() {
-  const W = 512, H = 512;
+  const W = SZ(512), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   const R = rnd(9021);
   ctx.fillStyle = '#557a3e'; ctx.fillRect(0, 0, W, H);
@@ -338,7 +350,7 @@ export function grassTexture() {
 
 /* ══════════════ 周边城市地块纹理（含窗格，夜间读作城市肌理） ══════════════ */
 export function cityBlockTexture() {
-  const W = 512, H = 512;
+  const W = SZ(512), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   const R = rnd(4477);
   ctx.fillStyle = '#e9e6df'; ctx.fillRect(0, 0, W, H);
@@ -365,7 +377,7 @@ export function cityBlockTexture() {
 
 /* ══════════════ 雨棚折板（站台/商业带用，带肋） ══════════════ */
 export function canopyTexture() {
-  const W = 256, H = 256;
+  const W = SZ(256), H = SZ(256);
   const cv = CV(W, H), ctx = cv.getContext('2d');
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#c8ccd0'); g.addColorStop(1, '#9aa1a8');

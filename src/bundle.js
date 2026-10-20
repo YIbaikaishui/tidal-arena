@@ -60,8 +60,8 @@ function resize() {
   if (!r) return;
   const w = window.innerWidth, h = window.innerHeight;
   const dpr = window.devicePixelRatio || 1;
-  const maxDpr = stage.quality === "low" ? 1 : stage.quality === "mid" ? 1.5 : stage.perf ? 1.25 : 2;
-  const budget = stage.perf ? PIXEL_BUDGET.eco : PIXEL_BUDGET.perf;
+  const maxDpr = stage.lite ? 1 : stage.quality === "low" ? 1 : stage.quality === "mid" ? 1.5 : stage.perf ? 1.25 : 2;
+  const budget = stage.lite ? PIXEL_BUDGET.lite : stage.perf ? PIXEL_BUDGET.eco : PIXEL_BUDGET.perf;
   const pr = Math.min(dpr, maxDpr, Math.sqrt(budget / (w * h)));
   stage.W = w;
   stage.H = h;
@@ -155,7 +155,7 @@ var init_core = __esm({
     lerp = (a, b, t) => a + (b - a) * t;
     smooth = (t) => t * t * (3 - 2 * t);
     easeInOut = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    PIXEL_BUDGET = { perf: 26e5, eco: 13e5 };
+    PIXEL_BUDGET = { perf: 26e5, eco: 13e5, lite: 9e5 };
     POWER_PREF = "default";
     NO_SOFTWARE = 1;
     stage = {
@@ -169,6 +169,10 @@ var init_core = __esm({
       quality: "high",
       perf: false,
       /* 省电档：降低像素预算 + 关泛光 + 不投影阴影 */
+      lite: false,
+      /* 轻量档：在省电档基础上再从几何源头减量（坐席抽稀 / 场景减密） */
+      seatStride: 3,
+      /* 轻量档的坐席抽稀步长 */
       software: false,
       softwareInfo: "",
       /* 软件渲染检测结果 */
@@ -5407,7 +5411,8 @@ var ZONE_NAMES = [
   "西 3",
   "西 4"
 ];
-function* iterSeats(tiers) {
+function* iterSeats(tiers, stride = 1) {
+  const step2 = Math.max(1, stride | 0);
   for (let ti = 0; ti < tiers.length; ti++) {
     const t = tiers[ti];
     for (const row of t.rows) {
@@ -5417,7 +5422,7 @@ function* iterSeats(tiers) {
       for (let z = 0; z < ZONES; z++) {
         const u0 = (z * zoneLen + AISLE_W * 0.5) / per;
         const du2 = perZone * SEAT_PITCH / per;
-        for (let i = 0; i < perZone; i++) {
+        for (let i = 0; i < perZone; i += step2) {
           const u = u0 + du2 * ((i + 0.5) / perZone);
           if (inSkip(u)) continue;
           yield { tier: t.id, tierIdx: ti, zone: z, row: row.k, u, s: row.sFront + 0.42, y: row.y, idx: i, perZone };
@@ -5482,8 +5487,8 @@ function seatModel() {
 }
 var MODEL = seatModel();
 var WHEELCHAIR = ZONES * TIERS.length * 2;
-function* seatInstances(model = MODEL) {
-  yield* iterSeats(model.tiers);
+function* seatInstances(model = MODEL, stride = 1) {
+  yield* iterSeats(model.tiers, stride);
 }
 var PALETTE = [
   ["#1d4b57", "#215262", "#25596b", "#2a6174", "#2f6a7d"],
@@ -6710,7 +6715,8 @@ function buildSeats(group, M, stage2) {
   const accent = [];
   const rowPerim = /* @__PURE__ */ new Map();
   for (const t of MODEL.tiers) for (const r of t.rows) rowPerim.set(t.id + ":" + r.k, r.perimeter);
-  for (const s of seatInstances(MODEL)) {
+  const stride = stage2 && stage2.lite ? Math.max(1, stage2.seatStride || 3) : 1;
+  for (const s of seatInstances(MODEL, stride)) {
     const perim = rowPerim.get(s.tier + ":" + s.row) || 330;
     const fu = (s.u % 1 + 1) % 1 * (ring.total / perim) * SEGS;
     const fi = (fu % SEGS + SEGS) % SEGS;
@@ -6724,7 +6730,7 @@ function buildSeats(group, M, stage2) {
     const t = boundaryT(hx, hz, hx * CORNER_F, nx, nz);
     dummy.position.set(nx * t, s.y, nz * t);
     dummy.rotation.set(0, Math.atan2(-nx, -nz), 0);
-    dummy.scale.set(1, 1, 1);
+    dummy.scale.set(stride, 1, 1);
     dummy.updateMatrix();
     const mtx = dummy.matrix.clone();
     const hex = seatColor(s.tierIdx, s.row, s.zone, s.idx, MODEL.tiers[s.tierIdx].rows[0].perZone);
@@ -6751,13 +6757,13 @@ function buildSeats(group, M, stage2) {
   };
   buckets.forEach((list, ti) => {
     const hi = [], lo = [];
-    const firstRows = 8;
+    const firstRows = stride > 1 ? 0 : 8;
     for (let i = 0; i < list.length; i++) (i < firstRows * 200 ? hi : lo).push(list[i]);
     mkInst(hi, hi, TIER_COLORS[ti], "seats-" + MODEL.tiers[ti].id + "-hi", true);
     mkInst(lo, lo, TIER_COLORS[ti], "seats-" + MODEL.tiers[ti].id, false);
   });
   mkInst(null, accent, 15781770, "seats-accent", false);
-  return { meshes, total: MODEL.total };
+  return { meshes, total: MODEL.total, stride };
 }
 function buildInterior(gInterior, ms, msG, M) {
   const S2 = GEO.outerS;
@@ -6958,10 +6964,15 @@ import * as THREE7 from "three";
 import * as THREE6 from "three";
 var CV = (w, h) => {
   const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
+  c.width = Math.max(2, Math.round(w));
+  c.height = Math.max(2, Math.round(h));
   return c;
 };
+var TEX_SCALE = 1;
+function setTextureScale(s) {
+  TEX_SCALE = Math.min(1, Math.max(0.25, s || 1));
+}
+var SZ = (w) => Math.max(2, Math.round(w * TEX_SCALE));
 var TEX = (cv, { srgb = true, wrap = THREE6.ClampToEdgeWrapping, aniso = 8 } = {}) => {
   const t = new THREE6.CanvasTexture(cv);
   t.colorSpace = srgb ? THREE6.SRGBColorSpace : THREE6.NoColorSpace;
@@ -6980,7 +6991,7 @@ function rnd(seed) {
   };
 }
 function plazaTexture() {
-  const W = 1024, H = 512;
+  const W = SZ(1024), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext("2d");
   const R = rnd(7713);
   ctx.fillStyle = "#a9a49a";
@@ -7020,7 +7031,7 @@ function plazaTexture() {
   return t;
 }
 function asphaltTexture() {
-  const W = 512, H = 512;
+  const W = SZ(512), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext("2d");
   const R = rnd(3311);
   ctx.fillStyle = "#3b3d40";
@@ -7054,7 +7065,7 @@ function asphaltTexture() {
   return t;
 }
 function grassTexture() {
-  const W = 512, H = 512;
+  const W = SZ(512), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext("2d");
   const R = rnd(9021);
   ctx.fillStyle = "#557a3e";
@@ -7085,7 +7096,7 @@ function grassTexture() {
   return t;
 }
 function cityBlockTexture() {
-  const W = 512, H = 512;
+  const W = SZ(512), H = SZ(512);
   const cv = CV(W, H), ctx = cv.getContext("2d");
   const R = rnd(4477);
   ctx.fillStyle = "#e9e6df";
@@ -7119,7 +7130,7 @@ function cityBlockTexture() {
   return t;
 }
 function canopyTexture() {
-  const W = 256, H = 256;
+  const W = SZ(256), H = SZ(256);
   const cv = CV(W, H), ctx = cv.getContext("2d");
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, "#c8ccd0");
@@ -7182,6 +7193,10 @@ function buildEnv(scene, stage2) {
   const root = new THREE7.Group();
   root.name = "ENV";
   scene.add(root);
+  const lite = !!(stage2 && stage2.lite);
+  const TREE_CAP = lite ? 260 : 720;
+  const TREE_TRIES = lite ? 320 : 900;
+  const HEDGE_DIV = lite ? 2 : 1;
   const groups = {};
   const G = (n) => {
     const g = new THREE7.Group();
@@ -7997,7 +8012,7 @@ function buildEnv(scene, stage2) {
         addTree(x, z, 10 + R() * 4, 3.1 + R() * 1);
       }
     }
-    for (let i = 0; i < 900 && treePos.length < 720; i++) {
+    for (let i = 0; i < TREE_TRIES && treePos.length < TREE_CAP; i++) {
       const a = R() * TAU2, rr = 330 + R() * 220;
       const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
       if (isOnAxis(x, z) || rawS(x, z, 0) < 260) continue;
@@ -8018,8 +8033,9 @@ function buildEnv(scene, stage2) {
     leafB.flush(gLandscape, "landscape-canopy-b");
     treeCount = treePos.length;
     const hedgeB = new GeomBatch();
-    for (let i = 0; i < 96; i++) {
-      const u = i / 96;
+    const HEDGE_N = Math.floor(96 / HEDGE_DIV);
+    for (let i = 0; i < HEDGE_N; i++) {
+      const u = i / HEDGE_N;
       const p = P3(u, R_PLZ + 4, 0);
       if (isOnAxis(p.x, p.z)) continue;
       const a = angOf(u);
@@ -8309,13 +8325,15 @@ function buildPostFX(stage2) {
         outlinePass.uniforms.strength.value = 0;
       }
     },
-    /* 省电模式：关泛光整条 mip 链 + 关颗粒/色差（每帧全屏逐像素计算，核显上是真金白银） */
+    /* 省电模式：关泛光整条 mip 链 + 关颗粒/色差（每帧全屏逐像素计算，核显上是真金白银）。
+       关掉泛光后画面整体偏暗，顺手补一点曝光，让「轻量」不等于「发灰」。 */
     setPerfMode(on) {
       api2.perfMode = !!on;
       api2.bloomEnabled = !api2.perfMode;
       bloom.enabled = !api2.perfMode;
       compose.uniforms.grain.value = api2.perfMode ? 0 : 0.016;
       compose.uniforms.ca.value = api2.perfMode ? 0 : 7e-4;
+      api2.exposureBoost = api2.perfMode ? 1.14 : 1;
       if (api2.perfMode) api2.setQuality(stage2.quality || "high");
       else api2.resize();
       return api2;
@@ -11258,6 +11276,30 @@ function buildUI(ctx) {
     }
   }
   $("#tgPerf") && $("#tgPerf").addEventListener("click", () => setPerfMode2(!S2.perf));
+  S2.lite = !!(stage2 && stage2.lite);
+  {
+    const tl = $("#tgLite");
+    if (tl) {
+      tl.classList.toggle("on", S2.lite);
+      setAttr(tl, "aria-checked", S2.lite ? "true" : "false");
+    }
+  }
+  $("#tgLite") && $("#tgLite").addEventListener("click", () => {
+    const next = !S2.lite;
+    S2.lite = next;
+    const tl = $("#tgLite");
+    if (tl) {
+      tl.classList.toggle("on", next);
+      setAttr(tl, "aria-checked", next ? "true" : "false");
+    }
+    if (window.__setLiteMode) window.__setLiteMode(next);
+    toast(
+      next ? "已开启轻量模式" : "已关闭轻量模式",
+      next ? "坐席与绿化减量、关泛光，刷新后完全生效" : "恢复完整细节，刷新后生效",
+      "plain"
+    );
+    say(next ? "轻量模式已开启（刷新后完全生效）" : "轻量模式已关闭（刷新后生效）");
+  });
   function setPanelOpen(panel, open) {
     panel.dataset.open = open ? "1" : "0";
     const ph = panel.querySelector(".ph");
@@ -12085,7 +12127,7 @@ function buildUI(ctx) {
     }
   }
   function update(dt, t, fps) {
-    if (S2.autoQuality && !S2._qBusy) {
+    if (S2.autoQuality && !S2._qBusy && !(stage2 && (stage2.lite || stage2.perf))) {
       S2._qSample = (S2._qSample || 0) + dt;
       if (S2._qSample > 2.5) {
         S2._qSample = 0;
@@ -12409,10 +12451,11 @@ async function boot() {
         if (perf.level === 1) {
           stage.quality = "mid";
           resize();
-          fx.bloom.enabled = true;
+          fx.bloom.enabled = !(stage.perf || stage.lite);
           ui.toast("已自动降低渲染分辨率", "性能自适应：保持流畅优先", "plain");
         } else if (perf.level === 2) {
           stage.quality = "low";
+          stage.perf = true;
           resize();
           fx.bloom.enabled = false;
           ui.toast("已切换到性能模式", "关闭泛光 / 降低采样", "plain");
@@ -12422,6 +12465,9 @@ async function boot() {
     initRenderer($2("#gl"));
     stage.quality = detectQuality();
     stage.perf = detectPerfMode();
+    stage.lite = detectLiteMode();
+    if (stage.lite) stage.perf = true;
+    setTextureScale(stage.lite ? 0.5 : 1);
     resize();
     let forceSW = false;
     try {
@@ -12459,7 +12505,7 @@ async function boot() {
     await step(steps[stepIdx][0], steps[stepIdx][1]);
     stepIdx++;
     const fx = buildPostFX(stage);
-    if (stage.perf) {
+    if (stage.perf || stage.lite) {
       fx.setPerfMode && fx.setPerfMode(true);
       stage.renderer.shadowMap.enabled = false;
     }
@@ -12542,11 +12588,44 @@ function detectPerfMode() {
   if (mem <= 4) return true;
   return false;
 }
+function detectLiteMode() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("full") === "1") return false;
+  const qv = q.get("lite");
+  if (qv === "1") return true;
+  if (qv === "0") return false;
+  try {
+    const saved = localStorage.getItem("tidal_lite");
+    if (saved === "1" || saved === "0") return saved === "1";
+  } catch (e) {
+  }
+  const gpu = (stage.softwareInfo || "").toLowerCase();
+  const strong = /(nvidia|geforce|rtx|gtx|radeon rx|apple m\d|adreno 7|mali-g7)/.test(gpu);
+  if (strong && !stage.software) return false;
+  return true;
+}
+function setLiteMode(on) {
+  try {
+    localStorage.setItem("tidal_lite", on ? "1" : "0");
+  } catch (e) {
+  }
+  const A = window.__app;
+  if (A) {
+    A.stage.lite = !!on;
+    A.stage.perf = !!on || A.stage.perf;
+    resize();
+    if (A.fx && A.fx.setPerfMode) A.fx.setPerfMode(!!on || A.stage.perf);
+    if (on) A.stage.renderer.shadowMap.enabled = false;
+  }
+  return true;
+}
+window.__setLiteMode = setLiteMode;
 function setPerfMode(on) {
   const A = window.__app;
   if (!A) return false;
   const perf = !!on;
   A.stage.perf = perf;
+  if (!perf) A.stage.lite = false;
   resize();
   if (A.fx && A.fx.setPerfMode) A.fx.setPerfMode(perf);
   A.stage.renderer.shadowMap.enabled = !perf;

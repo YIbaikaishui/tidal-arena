@@ -15,10 +15,10 @@ export const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
 
 /* ══════════════ 渲染舞台 ══════════════ */
 /* 像素预算（设备像素总数上限）：
-   · 高性能档 = 旧行为（2.6M，等于 1920×1080 @1.25 倍）
-   · 省电档   = 一半（1.3M）。实测帧率与像素数近似成反比，
-     2.6M→1.3M 在这台机器上是 17fps→30fps 的量级。 */
-export const PIXEL_BUDGET = { perf: 2.6e6, eco: 1.3e6 };
+   · 高性能档 = 2.6M（等于 1920×1080 @1.25 倍）
+   · 省电档   = 1.3M（实测帧率与像素数近似成反比）
+   · 轻量档   = 0.9M（给"只要看得清、跑得动"的人：手机、老显卡、远程桌面） */
+export const PIXEL_BUDGET = { perf: 2.6e6, eco: 1.3e6, lite: 0.9e6 };
 /* 功耗偏好：默认 'default'（跟随操作系统：拔电时系统会尽量用核显省电）。
    显式给 'high-performance' 会强制请求独显 —— 若双显卡笔记本接在核显输出上，
    部分驱动会退回软件渲染（SwiftShader，3D 只剩个位数帧），所以不做默认值。 */
@@ -31,6 +31,8 @@ export const stage = {
   renderer: null, scene: null, camera: null, canvas: null,
   W: 2, H: 2, pr: 1, quality: 'high',
   perf: false,                     /* 省电档：降低像素预算 + 关泛光 + 不投影阴影 */
+  lite: false,                     /* 轻量档：在省电档基础上再从几何源头减量（坐席抽稀 / 场景减密） */
+  seatStride: 3,                   /* 轻量档的坐席抽稀步长 */
   software: false, softwareInfo: '',   /* 软件渲染检测结果 */
   onResize: null, onContextLost: null,
 };
@@ -90,9 +92,12 @@ export function resize() {
   const r = stage.renderer; if (!r) return;
   const w = window.innerWidth, h = window.innerHeight;
   const dpr = window.devicePixelRatio || 1;
-  /* 省电档整体再压一档：即使手动选「高」也不超过 1.5 倍 */
-  const maxDpr = stage.quality === 'low' ? 1.0 : stage.quality === 'mid' ? 1.5 : (stage.perf ? 1.25 : 2.0);
-  const budget = stage.perf ? PIXEL_BUDGET.eco : PIXEL_BUDGET.perf;
+  /* 省电档整体再压一档：即使手动选「高」也不超过 1.5 倍；轻量档固定 1.0 */
+  const maxDpr = stage.lite ? 1.0
+    : stage.quality === 'low' ? 1.0
+      : stage.quality === 'mid' ? 1.5
+        : (stage.perf ? 1.25 : 2.0);
+  const budget = stage.lite ? PIXEL_BUDGET.lite : (stage.perf ? PIXEL_BUDGET.eco : PIXEL_BUDGET.perf);
   const pr = Math.min(dpr, maxDpr, Math.sqrt(budget / (w * h)));
   stage.W = w; stage.H = h; stage.pr = pr;
   r.setPixelRatio(pr);

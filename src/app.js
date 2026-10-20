@@ -16,6 +16,7 @@ import { Walk } from './lib/walk.js';
 import { DraftViews } from './lib/draft.js';
 import { ModeController } from './lib/modes.js';
 import { buildUI } from './ui.js';
+import { setTextureScale } from './lib/textures.js';
 /* ⚠️ v5：只静态导入 game/init.js（它只依赖 state.js，不含 three / 场景代码）。
    世界层 game/world.js 在 initWorld() 里延迟导入 —— 见 state.js 文件头的架构约束。
    v4 曾用 `import('./game/index.js')` 动态加载，index.html 的 modulepreload 会与动态
@@ -50,6 +51,12 @@ async function boot() {
     initRenderer($('#gl'));
     stage.quality = detectQuality();
     stage.perf = detectPerfMode();
+    stage.lite = detectLiteMode();
+    /* 轻量档天然包含省电档的渲染端降压（默认都开），
+       这样 setPerfMode / resize / postfx 只需认 perf 一个开关即可生效 */
+    if (stage.lite) stage.perf = true;
+    /* 纹理尺寸必须在任何程序化纹理生成之前定好（首屏耗时的大头之一） */
+    setTextureScale(stage.lite ? 0.5 : 1);
     resize();
 
     /* 软渲染兜底：SwiftShader / llvmpipe 里 100 万面只有个位数帧率，
@@ -89,8 +96,8 @@ async function boot() {
 
     await step(steps[stepIdx][0], steps[stepIdx][1]); stepIdx++;
     const fx = buildPostFX(stage);
-    /* 省电档：关泛光（UnrealBloom 是一整条 mip 链，实测占 3~5fps）、关投影阴影、降压分辨率 */
-    if (stage.perf) {
+    /* 省电/轻量档：关泛光（UnrealBloom 是一整条 mip 链，实测占 10+ fps）、关投影阴影、降压分辨率 */
+    if (stage.perf || stage.lite) {
       fx.setPerfMode && fx.setPerfMode(true);
       stage.renderer.shadowMap.enabled = false;
     }
@@ -146,7 +153,10 @@ async function boot() {
       };
     }
 
-    /* 自适应画质：连续 3 次采样低于 38fps 就降一档 */
+    /* 自适应画质：连续 3 次采样低于 38fps 就降一档。
+       ⚠️ 轻量/省电档下泛光本来就关着，这里绝不能再把它打开
+       （历史上 level===1 会无条件 bloom.enabled = true，导致开了省电模式后
+        掉几帧就被重新打开泛光，帧率反而更差）。 */
     function fnLog(f) {
       perf.history.push(f);
       if (perf.history.length > 8) perf.history.shift();
@@ -155,10 +165,11 @@ async function boot() {
       if (perf.slow > 4) {
         perf.slow = 0; perf.level++;
         if (perf.level === 1) {
-          stage.quality = 'mid'; resize(); fx.bloom.enabled = true;
+          stage.quality = 'mid'; resize();
+          fx.bloom.enabled = !(stage.perf || stage.lite);
           ui.toast('已自动降低渲染分辨率', '性能自适应：保持流畅优先', 'plain');
         } else if (perf.level === 2) {
-          stage.quality = 'low'; resize(); fx.bloom.enabled = false;
+          stage.quality = 'low'; stage.perf = true; resize(); fx.bloom.enabled = false;
           ui.toast('已切换到性能模式', '关闭泛光 / 降低采样', 'plain');
         }
       }
@@ -240,12 +251,57 @@ export function detectPerfMode() {
   return false;
 }
 
+/* ══════════════ 轻量档（默认档） ══════════════ */
+/* 设计目标：「点开就能看」，不需要独立显卡也能动。
+   与「省电档」的区别：省电档只是渲染端降压（分辨率/泛光/阴影），
+   轻量档是**从几何源头减量**（坐席抽稀 3 倍、树木与绿篱减半、关泛光），
+   所以首屏构建设备耗时更短、运行时 draw call 与顶点量都更低。
+
+   判定顺序：
+   ① URL ?lite=0 / ?lite=1 或 ?full=1（后者等价 ?lite=0）—— 最高优先
+   ② localStorage 'tidal_lite'
+   ③ 默认开启（面向分享场景：大多数访客的机器不强），
+      只有检测到"明显是高端独显"时才默认走完整档。 */
+export function detectLiteMode() {
+  const q = new URLSearchParams(location.search);
+  if (q.get('full') === '1') return false;
+  const qv = q.get('lite');
+  if (qv === '1') return true;
+  if (qv === '0') return false;
+  try {
+    const saved = localStorage.getItem('tidal_lite');
+    if (saved === '1' || saved === '0') return saved === '1';
+  } catch (e) { /* 隐私模式 */ }
+  /* 默认轻量。只有识别出 NVIDIA / Radeon / Apple 这类独显时才默认完整档 */
+  const gpu = (stage.softwareInfo || '').toLowerCase();
+  const strong = /(nvidia|geforce|rtx|gtx|radeon rx|apple m\d|adreno 7|mali-g7)/.test(gpu);
+  if (strong && !stage.software) return false;
+  return true;
+}
+
+/* 运行时切换轻量/完整档：几何已经在建，无法原地重建，所以刷新页面生效 */
+export function setLiteMode(on) {
+  try { localStorage.setItem('tidal_lite', on ? '1' : '0'); } catch (e) { /* noop */ }
+  const A = window.__app;
+  /* 轻量档的减量是构建期决定的，必须刷新；这里先同步渲染端能立即生效的部分 */
+  if (A) {
+    A.stage.lite = !!on;
+    A.stage.perf = !!on || A.stage.perf;
+    resize();
+    if (A.fx && A.fx.setPerfMode) A.fx.setPerfMode(!!on || A.stage.perf);
+    if (on) A.stage.renderer.shadowMap.enabled = false;
+  }
+  return true;
+}
+window.__setLiteMode = setLiteMode;
+
 /* 运行时切换性能档（设置面板 / 控制台都能调）：立即生效，不用刷新 */
 export function setPerfMode(on) {
   const A = window.__app;
   if (!A) return false;
   const perf = !!on;
   A.stage.perf = perf;
+  if (!perf) A.stage.lite = false;
   resize();
   if (A.fx && A.fx.setPerfMode) A.fx.setPerfMode(perf);
   A.stage.renderer.shadowMap.enabled = !perf;

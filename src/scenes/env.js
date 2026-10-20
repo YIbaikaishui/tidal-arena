@@ -74,6 +74,14 @@ export function buildEnv(scene, stage) {
   const root = new THREE.Group(); root.name = 'ENV';
   scene.add(root);
 
+  /* 轻量模式：整体减量（树木密度、城市体块、绿篱与路灯细节）。
+     实测这一档主要是吃 draw call 与 CPU 侧的实例矩阵更新，
+     所以削减的是"实例/批次数"，不是简单的面数。 */
+  const lite = !!(stage && stage.lite);
+  const TREE_CAP = lite ? 260 : 720;
+  const TREE_TRIES = lite ? 320 : 900;
+  const HEDGE_DIV = lite ? 2 : 1;
+
   const groups = {};
   const G = (n) => {
     const g = new THREE.Group(); g.name = n; root.add(g); groups[n] = g; return g;
@@ -945,7 +953,7 @@ export function buildEnv(scene, stage) {
       }
     }
     /* d) 绿地公园（广场与城市之间的绿环，随机成组） */
-    for (let i = 0; i < 900 && treePos.length < 720; i++) {
+    for (let i = 0; i < TREE_TRIES && treePos.length < TREE_CAP; i++) {
       const a = R() * TAU, rr = 330 + R() * 220;
       const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
       if (isOnAxis(x, z) || rawS(x, z, 0) < 260) continue;
@@ -970,8 +978,9 @@ export function buildEnv(scene, stage) {
 
     /* 绿篱：沿广场外缘与大道两侧（合批） */
     const hedgeB = new GeomBatch();
-    for (let i = 0; i < 96; i++) {
-      const u = i / 96;
+    const HEDGE_N = Math.floor(96 / HEDGE_DIV);
+    for (let i = 0; i < HEDGE_N; i++) {
+      const u = i / HEDGE_N;
       const p = P(u, R_PLZ + 4, 0);
       if (isOnAxis(p.x, p.z)) continue;
       const a = angOf(u);

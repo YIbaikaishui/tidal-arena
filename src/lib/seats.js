@@ -43,7 +43,11 @@ export const ZONE_NAMES = [
 export function zoneU(z) { return (z + 0.5) / ZONES; }
 
 /* ══════════════ 逐座生成（唯一真源） ══════════════ */
-function* iterSeats(tiers) {
+/* stride > 1 时按等间隔抽稀：只生成每 stride 个座位中的 1 个。
+   这是「轻量模式」的几何削减手段 —— 生成端就少算 3/4，首屏构建和渲染同时受益。
+   ⚠️ 容量统计（seatModel）必须始终走 stride=1，座位总数不能因为画质而变。 */
+function* iterSeats(tiers, stride = 1) {
+  const step = Math.max(1, stride | 0);
   for (let ti = 0; ti < tiers.length; ti++) {
     const t = tiers[ti];
     for (const row of t.rows) {
@@ -53,7 +57,7 @@ function* iterSeats(tiers) {
       for (let z = 0; z < ZONES; z++) {
         const u0 = (z * zoneLen + AISLE_W * 0.5) / per;
         const du = (perZone * SEAT_PITCH) / per;
-        for (let i = 0; i < perZone; i++) {
+        for (let i = 0; i < perZone; i += step) {
           const u = u0 + du * ((i + 0.5) / perZone);
           if (inSkip(u)) continue;
           yield { tier: t.id, tierIdx: ti, zone: z, row: row.k, u, s: row.sFront + 0.42, y: row.y, idx: i, perZone };
@@ -114,8 +118,9 @@ export const SUITE_SEATS = 768;
 export const MEDIA_SEATS = 320;
 
 /* ══════════════ 座椅实例化数据 ══════════════ */
-export function* seatInstances(model = MODEL) {
-  yield* iterSeats(model.tiers);
+/* stride：轻量模式下的抽稀步长（1 = 全量）。座位总数不受它影响，见 seatModel。 */
+export function* seatInstances(model = MODEL, stride = 1) {
+  yield* iterSeats(model.tiers, stride);
 }
 
 /* 颜色：按"潮汐带"图案 —— 深青 / 象牙白 / 赤陶三色，金色强调带 */

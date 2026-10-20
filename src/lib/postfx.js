@@ -162,13 +162,15 @@ export function buildPostFX(stage) {
       if (!obj) { outline.strength = 0; outlinePass.uniforms.strength.value = 0; }
     },
 
-    /* 省电模式：关泛光整条 mip 链 + 关颗粒/色差（每帧全屏逐像素计算，核显上是真金白银） */
+    /* 省电模式：关泛光整条 mip 链 + 关颗粒/色差（每帧全屏逐像素计算，核显上是真金白银）。
+       关掉泛光后画面整体偏暗，顺手补一点曝光，让「轻量」不等于「发灰」。 */
     setPerfMode(on) {
       api.perfMode = !!on;
       api.bloomEnabled = !api.perfMode;
       bloom.enabled = !api.perfMode;
       compose.uniforms.grain.value = api.perfMode ? 0 : 0.016;
       compose.uniforms.ca.value = api.perfMode ? 0 : 0.0007;
+      api.exposureBoost = api.perfMode ? 1.14 : 1.0;
       if (api.perfMode) api.setQuality(stage.quality || 'high');
       else api.resize();
       return api;

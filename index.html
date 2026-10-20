@@ -617,12 +617,17 @@
       <button class="switch on" id="tgQualityAuto" role="switch" aria-checked="true" aria-label="低帧率时自动降质"><i></i></button>
     </div>
     <div class="setrow">
+      <label for="tgLite">轻量模式</label>
+      <button class="switch" id="tgLite" role="switch" aria-checked="true" aria-label="轻量模式：减少场景细节，任何电脑都能流畅查看"><i></i></button>
+    </div>
+    <div class="setrow">
       <label for="tgPerf">省电模式</label>
       <button class="switch" id="tgPerf" role="switch" aria-checked="false" aria-label="省电模式：降分辨率并关闭泛光"><i></i></button>
     </div>
     <p class="setnote">系统检测到 <b id="setSysMotion">未开启</b>「减少动态」偏好时，将自动降低过渡动画。<br />
-      卡顿时先开<b>省电模式</b>（渲染分辨率减半、关泛光与阴影投影，实测帧率可翻倍），
-      再按 <kbd>Shift</kbd>+<kbd>P</kbd> 看右下角诊断面板确认用的是不是独立显卡。</p>
+      <b>轻量模式</b>（默认开）：坐席与绿化减量、关泛光，任何电脑都能流畅看，切换后需刷新。<br />
+      <b>省电模式</b>：再降分辨率；<kbd>Shift</kbd>+<kbd>P</kbd> 可看诊断面板确认是否在用独立显卡。<br />
+      想开泛光与完整细节就关掉轻量模式，或在地址后加 <code>?full=1</code>。</p>
   </div>
 </div>
 
