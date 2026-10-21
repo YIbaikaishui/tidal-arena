@@ -17,6 +17,12 @@ tools/shots/
 *.jpeg
 *.webp
 
+# 探针输出目录：截图 + 自动生成的验收报告 json，都是一次性产物
+tools/audit/
+tools/audit2/
+tools/v4/
+tools/*/*.json
+
 # 编辑器 / 系统
 .vscode/
 .idea/
