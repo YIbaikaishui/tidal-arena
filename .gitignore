@@ -17,6 +17,11 @@ tools/shots/
 *.jpeg
 *.webp
 
+# 例外：README / 个人主页用的封面图（压缩后 ~145KB，属于正式文档素材）
+!docs/images/
+!docs/images/*.jpg
+!docs/images/*.png
+
 # 探针输出目录：截图 + 自动生成的验收报告 json，都是一次性产物
 tools/audit/
 tools/audit2/

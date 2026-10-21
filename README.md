@@ -2,6 +2,8 @@
 
 **🌐 在线体验：https://yibaikaishui.github.io/tidal-arena/**
 
+[![潮汐场 TIDAL ARENA](docs/images/cover.jpg)](https://yibaikaishui.github.io/tidal-arena/)
+
 一个纯前端的 WebGL 三维足球场方案演示：8 万个真实生成的坐席、鞍面悬浮屋盖、四潮八柱、
 昼夜光照切换，外加一套可以真的玩的任务系统（漫游取物 → 疏散演练 → 收集徽章 → 建筑洞察）。
 
